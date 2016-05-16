@@ -19,7 +19,7 @@ The UI script will automatically run all defined tests and make the body of the 
 
 ### ToDo
 * benchmarking
-* If there's a bug in a form handler, it submits the form, confusing error
+* add a way to define a namespace level dependency
 
 It could look nicer. I would like to collect more data at some point, better traces, run-times. It would also be nice to be able to change the display settings, choosing what to show.
 

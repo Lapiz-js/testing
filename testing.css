@@ -18,6 +18,7 @@ html, body{
 }
 
 .DidNotRun{
+  color: #000;
   background: #efe;
 }
 

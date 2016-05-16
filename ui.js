@@ -35,7 +35,7 @@
         }
         out.push("</div>");
       } else {
-        var t = ""
+        var t = "x"
         if (!group.test.ran()){
           out.push("<div class='DidNotRun test'>");
         } else if (group.test.passed()){
