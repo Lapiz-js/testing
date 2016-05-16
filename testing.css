@@ -1,0 +1,55 @@
+html, body{
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+  color: #000;
+  font-family: monospace;
+}
+
+.Passed {
+  color: #000;
+  background: #C6E78B;
+}
+
+.Failed {
+  background: #B10000;
+  color: #ddd;
+}
+
+.DidNotRun{
+  background: #efe;
+}
+
+h1, .group {
+  max-width: 1100px;
+  display: block;
+  margin: auto;
+  padding: 5px;
+  text-align: left;
+  border: 2px solid black;
+  border-radius: 4px;
+}
+
+.group:not(:last-child){
+  margin-bottom: 3px;
+}
+
+.test{
+  width: 100%;
+  padding: 2px;
+}
+
+.test:not(:last-child){
+  border-bottom: 1px solid black;
+}
+.test:not(:last-child){
+  border-bottom: 1px solid black;
+}
+
+.testName{
+  max-width: 500px;
+  width: 50%;
+  display: block;
+  float: left;
+}
