@@ -14,7 +14,7 @@
 
       appendGroupToOut(results, out)
 
-      document.getElementsByTagName("body")[0].innerHTML = out.join("");
+      document.getElementsByTagName("body")[0].innerHTML+= out.join("");
     });
 
     function appendGroupToOut(group, out){
