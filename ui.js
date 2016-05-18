@@ -13,9 +13,23 @@
       }
 
       appendGroupToOut(results, out)
+      appendCoverageToOut(out);
 
       document.getElementsByTagName("body")[0].innerHTML+= out.join("");
     });
+
+    function appendCoverageToOut(out){
+      Lapiz.each(Lapiz.Test.files, function(k,file){
+        var coverage = Lapiz.Test.coverage(file)
+        var passed = (coverage.hasRun ===coverage.total) ? " Passed" : "";
+        out.push("<div class='group"+passed+"'>")
+        out.push("<h2>"+file+": "+coverage.hasRun+"/"+coverage.total+"</h2><ul>");
+        Lapiz.each(coverage.missed, function(k,marker){
+          out.push("<li>"+marker.replace(" : 0","")+"</li>")
+        });
+        out.push("</ul></div>")
+      });
+    }
 
     function appendGroupToOut(group, out){
       if (group.children !== undefined){
@@ -67,7 +81,6 @@
   };
 
   if (Lapiz.Module === undefined){
-    console.log("Bar");
     TestingUIModule(Lapiz);
   } else {
     Lapiz.Module("TestingUI", ["Testing"], TestingUIModule);

@@ -1,20 +1,15 @@
-/**
- * @namespace Lapiz
- */
-var Lapiz = (function($L) {
-  return $L || Object.create(null);
-}(Lapiz));
+var Lapiz = Lapiz || Object.create(null);
 
-/**
- * @namespace SetupTestModule
- */
+
+// SetupTestModule is a wrapper so that if Lapiz is used, it will be loaded
+// as a module and if it is not used, it will create a dummy Lapiz.
 (function SetupTestModule(){
-  /**
-   * @namespace TestModule
-   * @memberof Lapiz
-   */
-  var TestingModule = function($L){
-    // We're using Object.create(null) as a map, this makes it a little cleaner to read
+  
+
+  function TestingModule($L){
+
+    // We're using Object.create(null) as a map, this makes it a little cleaner
+    // to read
     function _Map(){
       return Object.create(null);
     }
@@ -200,11 +195,146 @@ var Lapiz = (function($L) {
       if (i > -1) { arr.splice(i, 1); }
     }
 
+    function _linkDependancy(dependant, dependency){
+      dependant.dependencies.push(dependency);
+    }
+
+    /**
+     * _resolveDependancies links all the dependencies that were given by name
+     * and links them to the actual test.
+     */
+    function _resolveDependancies(group){
+      var childNames = Object.keys(group.children);
+      var i, child;
+      for (i=0; i<childNames.length;i++){
+        child = group.children[ childNames[i] ];
+        _resolveDependancies(child);
+      }
+
+      // if this group contains a test, resolve it's dependencies
+      var test = group.test;
+      if (test !== undefined){
+        for(i=0; i<test.dependencyNames.length; i++){
+          dependency = nameMap[test.dependencyNames[i]];
+          if (dependency === undefined){
+            throw new Error("Test) Undefined dependency " + test.dependencyNames[i] + " in test " + test.name);
+          }
+          _linkDependancy(test, dependency);
+        }
+        dependencies = test.dependencies.slice(0); //copy
+      }
+    }
+
+    function _schedule(group, schedule, dependents){
+      if (dependents.indexOf(group) !== -1){
+        throw new Error("Found circular dependency in " + group.fullName());
+      }
+      if (group.scheduled){
+        return;
+      }
+      group.scheduled = true;
+
+      var i, childNames;
+      var idx = dependents.length;
+      dependents.push(group);
+      //check dependencies
+      if (group.dependencies !== undefined){
+        for(i=0; i<group.dependencies.length; i++){
+          _schedule(group.dependencies[i], schedule, dependents);
+        }
+      }
+      //check children
+      if (group.children !== undefined){
+        childNames = Object.keys(group.children);
+        for(i=0; i<childNames.length; i++){
+          _schedule(group.children[childNames[i]], schedule, dependents);
+        }
+      }
+
+      //check self
+      if (group.test !== undefined){
+        _schedule(group.test, schedule, dependents);
+      }
+      dependents.splice(idx, 1);
+
+      if (group.func !== undefined){
+        schedule.push(group);
+      }
+    }
+
+    function _Result(group){
+      var self = _Map();
+      self.defined = 0;
+      self.ran = 0;
+      self.passed = 0;
+      var i,r;
+
+      if (group.test !== undefined){
+        self.defined++;
+        if (group.test.ran()){
+          self.ran++;
+          if (group.test.passed()){
+            self.passed++;
+          }
+        }
+        self.test = _Map();
+        self.test.passed = group.test.pub.passed;
+        self.test.failed = group.test.pub.failed;
+        self.test.log = function(){return group.test.pub.log();};
+        self.test.time = function(){return group.test.time;};
+        self.test.ran = group.test.ran;
+        self.test.fullName = group.test.fullName;
+        self.test.name = group.test.parent.name;
+      }
+
+      var childNames = Object.keys(group.children);
+      if (childNames.length > 0){
+        self.children = _Map();
+        self.fullName = group.fullName;
+        for(i=0; i<childNames.length; i++){
+          r = _Result(group.children[childNames[i]]);
+          self.children[childNames[i]] = r;
+          self.defined += r.defined;
+          self.ran += r.ran;
+          self.passed += r.passed;
+        }
+      }
+      return self;
+    }
+
+    function _run(test){
+      var i, dependency;
+      var run = true;
+      for(i=0; i<test.dependencies.length; i++){
+        dependency = test.dependencies[i];
+        if (!dependency.ran() || dependency.failed()){
+          run = false;
+          break;
+        }
+      }
+      if (run){
+        var s = Date.now();
+        try {
+          test.func(test.pub);
+        } catch(err) {
+          if (err.message){
+            test.pub.error(err.message + "<pre>" + err.stack + "</pre>");
+            console.error(err.message + "\n" + err.stack);
+          } else {
+            test.pub.error("<pre>" + err.stack + "</pre>");
+            console.error(err.stack);
+          }
+        }
+        test._ran = true;
+        test.time = Date.now() - s;
+      }
+    }
+
     /**
      * TestInterface checks and resolves the arguments before calling _addTest(name, dependencies, testFunc).
      * This handles the case that it accepts either (name, testFunc) or (name, dependencies, testFunc).
      */
-    $L.Test = function TestInterface(name, funcOrDep, testFunc){
+    function _TestInterface(name, funcOrDep, testFunc){
       // check name first, so it can be used if there are other errors
       if (typeof name !== "string"){
         throw new Error("Test) Name must be a string, got: "+(typeof name));
@@ -220,177 +350,93 @@ var Lapiz = (function($L) {
       var dependencies = [];
       var i;
       if (testFunc === undefined){
-        if (typeof funcOrDep === "function") {
-          testFunc = funcOrDep;
-        } else {
-          throw new Error(name+": test function not defined");
-        }
+        testFunc = funcOrDep;
       } else {
-        if (!(funcOrDep instanceof Array)) {
-          throw new Error("Test) "+name+": dependencies must be an array of strings");
-        } else {
-          for (var i = 0; i < funcOrDep.length; ++i) {
-            if (typeof funcOrDep[i] !== "string"){
-              throw new Error("Test) "+name+": dependencies must be an array of strings, found " + (typeof funcOrDep[i]) + " at "+i);
-            }
-            dependencies.push(funcOrDep[i]);
-         };
-        }
-        if (typeof testFunc !== "function") {
-          throw new Error("Test) " + name + ": test function not defined");
-        }
+        dependencies = funcOrDep;
       }
 
-      function _linkDependancy(dependant, dependency){
-        dependant.dependencies.push(dependency);
+      if (typeof testFunc !== "function") {
+        throw new Error("Test) " + name + ": test function not defined");
       }
 
-      /**
-       * _resolveDependancies links all the dependencies that were given by name
-       * and links them to the actual test.
-       */
-      function _resolveDependancies(group){
-        var childNames = Object.keys(group.children);
-        var i, child;
-        for (i=0; i<childNames.length;i++){
-          child = group.children[ childNames[i] ];
-          _resolveDependancies(child);
-        }
-
-        // if this group contains a test, resolve it's dependencies
-        var test = group.test;
-        if (test !== undefined){
-          for(i=0; i<test.dependencyNames.length; i++){
-            dependency = nameMap[test.dependencyNames[i]];
-            if (dependency === undefined){
-              throw new Error("Test) Undefined dependency " + test.dependencyNames[i] + " in test " + test.name);
-            }
-            _linkDependancy(test, dependency);
+      if (!(dependencies instanceof Array)) {
+        throw new Error("Test) "+name+": dependencies must be an array of strings");
+      } else {
+        for (var i = 0; i < dependencies.length; ++i) {
+          if (typeof dependencies[i] !== "string"){
+            throw new Error("Test) "+name+": dependencies must be an array of strings, found " + (typeof dependencies[i]) + " at "+i);
           }
-          dependencies = test.dependencies.slice(0); //copy
-        }
-      }
-
-      function _schedule(group, schedule, dependents){
-        if (dependents.indexOf(group) !== -1){
-          throw new Error("Found circular dependency in " + group.fullName());
-        }
-        if (group.scheduled){
-          return;
-        }
-        group.scheduled = true;
-
-        var i, childNames;
-        var idx = dependents.length;
-        dependents.push(group);
-        //check dependencies
-        if (group.dependencies !== undefined){
-          for(i=0; i<group.dependencies.length; i++){
-            _schedule(group.dependencies[i], schedule, dependents);
-          }
-        }
-        //check children
-        if (group.children !== undefined){
-          childNames = Object.keys(group.children);
-          for(i=0; i<childNames.length; i++){
-            _schedule(group.children[childNames[i]], schedule, dependents);
-          }
-        }
-
-        //check self
-        if (group.test !== undefined){
-          _schedule(group.test, schedule, dependents);
-        }
-        dependents.splice(idx, 1);
-
-        if (group.func !== undefined){
-          schedule.push(group);
-        }
-      }
-
-      function _Result(group){
-        var self = _Map();
-        self.defined = 0;
-        self.ran = 0;
-        self.passed = 0;
-        var i,r;
-
-        if (group.test !== undefined){
-          self.defined++;
-          if (group.test.ran()){
-            self.ran++;
-            if (group.test.passed()){
-              self.passed++;
-            }
-          }
-          self.test = _Map();
-          self.test.passed = group.test.pub.passed;
-          self.test.failed = group.test.pub.failed;
-          self.test.log = function(){return group.test.pub.log();};
-          self.test.time = function(){return group.test.time;};
-          self.test.ran = group.test.ran;
-          self.test.fullName = group.test.fullName;
-          self.test.name = group.test.parent.name;
-        }
-
-        var childNames = Object.keys(group.children);
-        if (childNames.length > 0){
-          self.children = _Map();
-          self.fullName = group.fullName;
-          for(i=0; i<childNames.length; i++){
-            r = _Result(group.children[childNames[i]]);
-            self.children[childNames[i]] = r;
-            self.defined += r.defined;
-            self.ran += r.ran;
-            self.passed += r.passed;
-          }
-        }
-        return self;
-      }
-
-      function _run(test){
-        var i, dependency;
-        var run = true;
-        for(i=0; i<test.dependencies.length; i++){
-          dependency = test.dependencies[i];
-          if (!dependency.ran() || dependency.failed()){
-            run = false;
-            break;
-          }
-        }
-        if (run){
-          var s = Date.now();
-          try {
-            test.func(test.pub);
-          } catch(err) {
-            if (err.message){
-              test.pub.error(err.message + "<pre>" + err.stack + "</pre>");
-              console.error(err.message + "\n" + err.stack);
-            } else {
-              test.pub.error("<pre>" + err.stack + "</pre>");
-              console.error(err.stack);
-            }
-          }
-          test._ran = true;
-          test.time = Date.now() - s;
-        }
-      }
-
-      $L.Test.Run = function(){
-        _resolveDependancies(_root);
-        var plan = [];
-        _schedule(_root, plan, []);
-        var i, s;
-        //TODO: break this up with work queue
-        for(i=0; i<plan.length; i++){
-          _run(plan[i]);
-        }
-        return _Result(_root);
-      }
+       };
+      }      
 
       _addTest(name, dependencies, testFunc);
     };
-  };
+
+    Object.defineProperty($L, "Test", {"value":_TestInterface});
+
+    function _runAll(){
+      _resolveDependancies(_root);
+      var plan = [];
+      _schedule(_root, plan, []);
+      var i, s;
+      //TODO: break this up with work queue
+      for(i=0; i<plan.length; i++){
+        _run(plan[i]);
+      }
+      return _Result(_root);
+    };
+    Object.defineProperty($L.Test, "Run", {"value":_runAll});
+
+    var _coverageMarkers = _Map();
+    var _markedFiles = _Map();
+    function _registerMarkers(){
+      var i;
+      for(i=0; i<arguments.length; i+=1){
+        if (_coverageMarkers[arguments[i]] == undefined){
+          _coverageMarkers[arguments[i]] = 0;
+          _markedFiles[arguments[i].split(')')[0]] = true;
+        }
+      }
+    }
+    Object.defineProperty($L.Test, "regMks", {"value":_registerMarkers});
+
+    function _incMarker(marker){
+      if (_coverageMarkers[marker] == undefined){
+        _coverageMarkers[marker] = 1;
+        _markedFiles[marker.split(')')[0]] = true;
+      } else {
+        _coverageMarkers[marker] += 1;
+      }
+    }
+    Object.defineProperty($L.Test, "files", {"get":function(){return Object.keys(_markedFiles);}});
+    Object.defineProperty($L.Test, "incMk", {"value":_incMarker});
+
+    Object.defineProperty($L.Test, "mkrs", {"value":_coverageMarkers});
+
+    function _coverage(file){
+      var keys = Object.keys(_coverageMarkers);
+      var results = {
+        'hasRun': 0,
+        'total': 0,
+        'missed': [],
+      };
+      var i, marker, x;
+      for(i=0; i<keys.length; i+=1){
+        marker = keys[i];
+        x = marker.split(')');
+        if (x[0] === file){
+          results.total += 1;
+          if (_coverageMarkers[marker] > 0){
+            results.hasRun += 1;
+          } else {
+            results.missed.push(x[1].trim());
+          }
+        }
+      }
+      return results;
+    }
+    Object.defineProperty($L.Test, "coverage", {"value":_coverage});
+  }
 
   if (Lapiz.Module === undefined){
     TestingModule(Lapiz);
