@@ -54,3 +54,7 @@ h1, .group {
   display: block;
   float: left;
 }
+
+#coverage{
+  float: right;
+}

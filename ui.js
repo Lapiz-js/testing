@@ -1,27 +1,40 @@
 (function SetupTestingUI() {
 
   var TestingUIModule = function(){
+    // add 10ms delay to give UI tests a chance to run
     document.addEventListener("DOMContentLoaded", function(){
-      var results = Lapiz.Test.Run();
+      setTimeout(function(){
+        var results = Lapiz.Test.Run();
 
-      var overall = "Passed";
-      var out = [];
-      if (results.defined !== results.passed){
-        out.push("<h1 class='Failed'> Of " + results.defined + " tests, " + results.ran + " ran and " + results.passed + " passed </h1>");
-      } else {
-        out.push("<h1 class='Passed'>" + results.defined + " Passed </h1>");
-      }
+        var overall = "Passed";
+        var out = [];
+        if (results.defined !== results.passed){
+          out.push("<h1 class='Failed'> Of " + results.defined + " tests, " + results.ran + " ran and " + results.passed + " passed");
+        } else {
+          out.push("<h1 class='Passed'>" + results.defined + " Passed");
+        }
 
-      appendGroupToOut(results, out)
-      appendCoverageToOut(out);
+        out.push("<span id='coverage'></span></h1>")
 
-      document.getElementsByTagName("body")[0].innerHTML+= out.join("");
+        appendGroupToOut(results, out)
+        appendCoverageToOut(out);
+
+        document.getElementsByTagName("body")[0].innerHTML+= out.join("");
+      }, 10);
     });
 
     function appendCoverageToOut(out){
-      Lapiz.each(Lapiz.Test.files, function(k,file){
+      var totalRun = 0;
+      var totalMarkers = 0;
+      var files = Lapiz.Test.files;
+      if (files.length > 0){
+        out.push("<h1><a name='beginCoverage'></a>Coverage</h1>")
+      }
+      Lapiz.each(files, function(k,file){
         var coverage = Lapiz.Test.coverage(file)
-        var passed = (coverage.hasRun ===coverage.total) ? " Passed" : "";
+        totalRun += coverage.hasRun;
+        totalMarkers += coverage.total;
+        var passed = (coverage.hasRun === coverage.total) ? " Passed" : "";
         out.push("<div class='group"+passed+"'>")
         out.push("<h2>"+file+": "+coverage.hasRun+"/"+coverage.total+"</h2><ul>");
         Lapiz.each(coverage.missed, function(k,marker){
@@ -29,6 +42,12 @@
         });
         out.push("</ul></div>")
       });
+      setTimeout(function(){
+        if (totalMarkers > 0){
+          var percent = Math.round((100*totalRun)/totalMarkers);
+          document.getElementById("coverage").innerHTML = "<a href='#beginCoverage'>Coverage: " + totalRun + "/"+totalMarkers + "(" + percent + "%)</a>";
+        }
+      }); //bit of a hack
     }
 
     function appendGroupToOut(group, out){
