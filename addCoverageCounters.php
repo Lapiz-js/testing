@@ -131,11 +131,13 @@ class AddCoverageCounters{
 
   private function functionalBlockState(){
     $parenDepth = 0;
+    $canReturn = false;
     while($this->idx < $this->len){
       $chr = $this->getChr();
       switch ($chr) {
         case '(':
           $parenDepth += 1;
+          $canReturn = true;
           break;
         case ')':
           $parenDepth -= 1;
@@ -151,7 +153,7 @@ class AddCoverageCounters{
         case "\t":
           break;
         default:
-          if ($parenDepth == 0){
+          if ($parenDepth == 0 && $canReturn){
             return;
           }
       }

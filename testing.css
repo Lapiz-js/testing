@@ -17,6 +17,10 @@ html, body{
   color: #ddd;
 }
 
+.Failed a {
+  color: #CECECE;
+}
+
 .DidNotRun{
   color: #000;
   background: #efe;

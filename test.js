@@ -299,6 +299,7 @@ var Lapiz = Lapiz || Object.create(null);
           self.passed += r.passed;
         }
       }
+      self.failed = self.ran - self.passed;
       return self;
     }
 
@@ -392,7 +393,7 @@ var Lapiz = Lapiz || Object.create(null);
     function _registerMarkers(){
       var i;
       for(i=0; i<arguments.length; i+=1){
-        if (_coverageMarkers[arguments[i]] == undefined){
+        if (_coverageMarkers[arguments[i]] === undefined){
           _coverageMarkers[arguments[i]] = 0;
           _markedFiles[arguments[i].split(')')[0]] = true;
         }

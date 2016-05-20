@@ -9,7 +9,7 @@
         var overall = "Passed";
         var out = [];
         if (results.defined !== results.passed){
-          out.push("<h1 class='Failed'> Of " + results.defined + " tests, " + results.ran + " ran and " + results.passed + " passed");
+          out.push("<h1 class='Failed'> Of " + results.defined + " tests, " + results.ran + " ran and " + results.failed + " <a href='#firstFailure'>failed</a>");
         } else {
           out.push("<h1 class='Passed'>" + results.defined + " Passed");
         }
@@ -20,6 +20,13 @@
         appendCoverageToOut(out);
 
         document.getElementsByTagName("body")[0].innerHTML+= out.join("");
+
+        var firstFailure = document.querySelector(".Failed.test");
+        if (firstFailure){
+          var ffa = document.createElement("a");
+          ffa.setAttribute('name', 'firstFailure');
+          firstFailure.parentNode.insertBefore(ffa,firstFailure);
+        }
       }, 10);
     });
 
@@ -30,18 +37,25 @@
       if (files.length > 0){
         out.push("<h1><a name='beginCoverage'></a>Coverage</h1>")
       }
-      Lapiz.each(files, function(k,file){
+      var keys = Object.keys(files);
+      var l = keys.length;
+      var i,j,key, file, ml, missed;
+      for(i=0; i<files.length; i+=1){
+        key = keys[i];
+        file = files[key];
         var coverage = Lapiz.Test.coverage(file)
         totalRun += coverage.hasRun;
         totalMarkers += coverage.total;
         var passed = (coverage.hasRun === coverage.total) ? " Passed" : "";
         out.push("<div class='group"+passed+"'>")
         out.push("<h2>"+file+": "+coverage.hasRun+"/"+coverage.total+"</h2><ul>");
-        Lapiz.each(coverage.missed, function(k,marker){
-          out.push("<li>"+marker.replace(" : 0","")+"</li>")
-        });
+        missed = coverage.missed;
+        ml = missed.length;
+        for(j=0; j<ml; j++){
+          out.push("<li>"+missed[j].replace(" : 0","")+"</li>");
+        }
         out.push("</ul></div>")
-      });
+      }
       setTimeout(function(){
         if (totalMarkers > 0){
           var percent = Math.round((100*totalRun)/totalMarkers);
