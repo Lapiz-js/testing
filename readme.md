@@ -20,6 +20,7 @@ The UI script will automatically run all defined tests and make the body of the 
 ### ToDo
 * benchmarking
 * add a way to define a namespace level dependency
+* in UI, move sub-groups to bottom (currently, they get interspersed)
 
 It could look nicer. I would like to collect more data at some point, better traces, run-times. It would also be nice to be able to change the display settings, choosing what to show.
 

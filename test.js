@@ -319,11 +319,12 @@ var Lapiz = Lapiz || Object.create(null);
           test.func(test.pub);
         } catch(err) {
           if (err.message){
+            console.error(err);
+            console.log(err.stack);
             test.pub.error(err.message + "<pre>" + err.stack + "</pre>");
-            console.error(err.message + "\n" + err.stack);
           } else {
-            test.pub.error("<pre>" + err.stack + "</pre>");
             console.error(err.stack);
+            test.pub.error("<pre>" + err.stack + "</pre>");
           }
         }
         test._ran = true;
