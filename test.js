@@ -14,16 +14,13 @@ var Lapiz = Lapiz || Object.create(null);
       return Object.create(null);
     }
 
-    /**
-     * testnameMap maps the name of the test or group to the instance. This makes is
-     * easier to retreive by name than splitting the name by / are recursing
-     * through the heirarchy
-     */
+    
+    // testnameMap maps the name of the test or group to the instance. This makes is
+    // easier to retreive by name than splitting the name by / are recursing
+    // through the heirarchy
     var nameMap = _Map();
 
-    /**
-     * test is a list of all the test, it does not include groups
-     */
+    // test is a list of all the test, it does not include groups
     var tests = [];
 
     /**
@@ -134,18 +131,36 @@ var Lapiz = Lapiz || Object.create(null);
 
       self.pub = _Map();
       //public methods
+
+      // > Lapiz.Test:testObject.log()
+      // > Lapiz.Test:testObject.log(args...)
+      // If no arguments are given, the log is returned as a slice of strings.
+      // If an arguments are given, they will be concatenated into a string and
+      // appended to the log.
       self.pub.log = function(){
         return _log(self, arguments);
       };
+
+      // > Lapiz.Test:testObject.fail()
+      // Causes the test to fail.
       self.pub.fail = function(){
         self.failed = true;
       };
+
+      // > Lapiz.Test:testObject.error(args...)
+      // Causes the test to fail and logs the arguments.
       self.pub.error = function(){
         self._failed = true;
         _log(self, arguments);
       };
+
+      // > Lapiz.Test:testObject.failed()
+      // Returns a bool indicating if the test has failed.
       self.pub.failed = function(){ return self._failed; };
       self.failed = self.pub.failed;
+
+      // > Lapiz.Test:testObject.passed()
+      // Returns a bool indicating if the test is currently passing.
       self.pub.passed = function(){ return !self._failed; };
       self.passed = self.pub.passed;
       Object.freeze(self.pub);
@@ -332,11 +347,37 @@ var Lapiz = Lapiz || Object.create(null);
       }
     }
 
-    /**
-     * TestInterface checks and resolves the arguments before calling _addTest(name, dependencies, testFunc).
-     * This handles the case that it accepts either (name, testFunc) or (name, dependencies, testFunc).
-     */
+    // Lapiz.Test(name, dependencies, testFunction)
+    // Lapiz.Test(name, testFunction)
+    // Defines a test.
+
+    // > Lapiz.Test:name
+    // > "name"
+    // > "group/name"
+    // > "group/subgroup/name"
+    // A test requires a name. Test groups can be nested to an arbitrary
+    // depth.
+
+    // > Lapiz.Test:dependencies
+    // > ["name", "group/", "group/subgroup/"]
+    // Dependencies is defined as a slice of strings. A string can indicate a
+    // specific test or a group of tests. To indicate a group, the string should
+    // end with a slash. If a dependency fails, the test will be skipped. The
+    // test runner will figure out the correct order to run the tests. An error
+    // will be thrown if dependencies are missing or if a circular dependency
+    // exists.
+
+    // > Lapiz.Test:testFunction
+    // > function(testObject)
+    // This is the function that will be invoked when the test runs.
+
+    // > Lapiz.Test:testObject
+    // A test object will be passed into each test.
+
     function _TestInterface(name, funcOrDep, testFunc){
+      // TestInterface checks and resolves the arguments before calling _addTest(name, dependencies, testFunc).
+      // This handles the case that it accepts either (name, testFunc) or (name, dependencies, testFunc).
+
       // check name first, so it can be used if there are other errors
       if (typeof name !== "string"){
         throw new Error("Test) Name must be a string, got: "+(typeof name));
@@ -373,9 +414,10 @@ var Lapiz = Lapiz || Object.create(null);
 
       _addTest(name, dependencies, testFunc);
     };
-
     Object.defineProperty($L, "Test", {"value":_TestInterface});
 
+    // > Test.Run()
+    // Runs all the tests.
     function _runAll(){
       _resolveDependancies(_root);
       var plan = [];
