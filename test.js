@@ -23,10 +23,7 @@ var Lapiz = Lapiz || Object.create(null);
     // test is a list of all the test, it does not include groups
     var tests = [];
 
-    /**
-     * @constructor _Group
-     * @param name should be string ending, except for root
-     */
+    // _Group is not exposed, it is just used internally to handle dependancies
     function _Group(name, parent){
       var self = _Map();
 
@@ -132,8 +129,8 @@ var Lapiz = Lapiz || Object.create(null);
       self.pub = _Map();
       //public methods
 
-      // > Lapiz.Test:testObject.log()
-      // > Lapiz.Test:testObject.log(args...)
+      // > TestObject.log()
+      // > TestObject.log(args...)
       // If no arguments are given, the log is returned as a slice of strings.
       // If an arguments are given, they will be concatenated into a string and
       // appended to the log.
@@ -141,25 +138,25 @@ var Lapiz = Lapiz || Object.create(null);
         return _log(self, arguments);
       };
 
-      // > Lapiz.Test:testObject.fail()
+      // > TestObject.fail()
       // Causes the test to fail.
       self.pub.fail = function(){
         self.failed = true;
       };
 
-      // > Lapiz.Test:testObject.error(args...)
+      // > TestObject.error(args...)
       // Causes the test to fail and logs the arguments.
       self.pub.error = function(){
         self._failed = true;
         _log(self, arguments);
       };
 
-      // > Lapiz.Test:testObject.failed()
+      // > TestObject.failed()
       // Returns a bool indicating if the test has failed.
       self.pub.failed = function(){ return self._failed; };
       self.failed = self.pub.failed;
 
-      // > Lapiz.Test:testObject.passed()
+      // > TestObject.passed()
       // Returns a bool indicating if the test is currently passing.
       self.pub.passed = function(){ return !self._failed; };
       self.passed = self.pub.passed;
@@ -277,10 +274,19 @@ var Lapiz = Lapiz || Object.create(null);
       }
     }
 
+    // > Result
+    // Results form a tree where each Result may be associated with a test and
+    // may have children. The leaves of the tree are all tests with no children.
     function _Result(group){
       var self = _Map();
+      // > Result.defined
+      // How many tests were defined
       self.defined = 0;
+      // > Result.ran
+      // How many tests ran
       self.ran = 0;
+      // > Result.passed
+      // How many tests passed
       self.passed = 0;
       var i,r;
 
@@ -292,19 +298,41 @@ var Lapiz = Lapiz || Object.create(null);
             self.passed++;
           }
         }
+        // > Result.test
+        // If a Result has a test, it's data is collected here
         self.test = _Map();
+        // > Result.test.passed
+        // True if the test passed
         self.test.passed = group.test.pub.passed;
+        // > Result.test.failed
+        // True if the test failed
         self.test.failed = group.test.pub.failed;
+        // > Result.test.log()
+        // Gets all data written to the test log while the test was running.
         self.test.log = function(){return group.test.pub.log();};
+        // > Result.test.time()
+        // How long the test took to run
         self.test.time = function(){return group.test.time;};
+        // > Result.test.ran()
+        // True if the test ran
         self.test.ran = group.test.ran;
+        // > Result.test.fullName()
+        // Full name, including groups
         self.test.fullName = group.test.fullName;
+        // > Result.test.name
+        // Returns just the test name, not the groups
         self.test.name = group.test.parent.name;
       }
 
       var childNames = Object.keys(group.children);
       if (childNames.length > 0){
+        // > Result.children[]
+        // If the Result is a group, the child tests and groups will be listed
+        // here.
         self.children = _Map();
+        // > Result.fullName()
+        // Only set if the result is a group. It will be full group name ending
+        // with "/".
         self.fullName = group.fullName;
         for(i=0; i<childNames.length; i++){
           r = _Result(group.children[childNames[i]]);
@@ -314,7 +342,10 @@ var Lapiz = Lapiz || Object.create(null);
           self.passed += r.passed;
         }
       }
+      // > Result.failed
+      // Number of tests that failed
       self.failed = self.ran - self.passed;
+      Object.freeze(self);
       return self;
     }
 
@@ -347,18 +378,18 @@ var Lapiz = Lapiz || Object.create(null);
       }
     }
 
-    // Lapiz.Test(name, dependencies, testFunction)
-    // Lapiz.Test(name, testFunction)
+    // > Lapiz.Test(TestName, TestDependencies, TestFunction)
+    // > Lapiz.Test(TestName, TestFunction)
     // Defines a test.
 
-    // > Lapiz.Test:name
+    // > TestName
     // > "name"
     // > "group/name"
     // > "group/subgroup/name"
     // A test requires a name. Test groups can be nested to an arbitrary
     // depth.
 
-    // > Lapiz.Test:dependencies
+    // > TestDependencies
     // > ["name", "group/", "group/subgroup/"]
     // Dependencies is defined as a slice of strings. A string can indicate a
     // specific test or a group of tests. To indicate a group, the string should
@@ -367,11 +398,11 @@ var Lapiz = Lapiz || Object.create(null);
     // will be thrown if dependencies are missing or if a circular dependency
     // exists.
 
-    // > Lapiz.Test:testFunction
-    // > function(testObject)
+    // > TestFunction
+    // > function(TestObject)
     // This is the function that will be invoked when the test runs.
 
-    // > Lapiz.Test:testObject
+    // > TestObject
     // A test object will be passed into each test.
 
     function _TestInterface(name, funcOrDep, testFunc){
@@ -416,8 +447,9 @@ var Lapiz = Lapiz || Object.create(null);
     };
     Object.defineProperty($L, "Test", {"value":_TestInterface});
 
-    // > Test.Run()
-    // Runs all the tests.
+    // > Lapiz.Test.Run()    
+    // Runs all the tests and returns a Result object. The children of the
+    // Result object form a tree containing all the tests.
     function _runAll(){
       _resolveDependancies(_root);
       var plan = [];
