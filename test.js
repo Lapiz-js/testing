@@ -100,9 +100,7 @@ var Lapiz = Lapiz || Object.create(null);
     var _root = _Group("", null);
     _root.fullName = function(){ return ""; };
 
-    /**
-     * _log is used in _Test.log and _Test.error
-     */
+    // _log is used in _Test.log and _Test.error
     function _log(test, args){
       if (args.length === 0) {
         return test.log.slice(0);
@@ -114,9 +112,6 @@ var Lapiz = Lapiz || Object.create(null);
       test.log.push(strArgs.join(""));
     }
 
-    /**
-     * @constructor _Test
-     */
     function _Test(name, dependencies, testFunc){
       var self = _Map();
       // private properties
@@ -526,9 +521,14 @@ var Lapiz = Lapiz || Object.create(null);
       }
     }
 
-    // > Lapiz.Test.Run()    
-    // Runs all the tests and returns a Result object. The children of the
-    // Result object form a tree containing all the tests.
+    // > Lapiz.Test.Run(ResultsCallback)
+    // Runs all the tests. When the tests are done it will call ResultsCallback.
+    // The children of the Result object passed into ResultsCallback form a tree
+    // containing all the tests.
+
+    // > ResultsCallback(Result)
+    // Called from Lapiz.Test.Run. The children of the Result object form a tree
+    // containing all the tests.
     function _runAll(callback){
       _checkCircularDependencies(_root, []);
       _root.dependents.push(function(){
