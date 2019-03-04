@@ -84,7 +84,7 @@
         out.push("</div>");
       } else {
         var t = "x"
-        if (group.test.ran() !== Lapiz.Test.RanStates.Ran.Int){
+        if (group.test.ran() !== Lapiz.Test.RanStates.Ran){
           out.push("<div class='DidNotRun test'>");
         } else if (group.test.passed()){
           out.push("<div class='Passed test'>");

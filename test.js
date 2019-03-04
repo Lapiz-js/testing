@@ -12,27 +12,11 @@ var Lapiz = Lapiz || Object.create(null);
     }
 
     var RanStates = {
-      "NotRan" : {
-        "Str": "NotRan",
-        "Int": 0
-      },
-      "Ran" : {
-        "Str": "Ran",
-        "Int": 1
-      },
-      "Waiting" : {
-        "Str": "Waiting",
-        "Int": 2
-      },
-      "Skip" : {
-        "Str": "Skip",
-        "Int": 3
-      },
+      "NotRan" : 0,
+      "Ran" : 1,
+      "Waiting" : 2,
+      "Skip" : 3,
     };
-    RanStates[0] = RanStates.NotRan;
-    RanStates[1] = RanStates.Ran;
-    RanStates[2] = RanStates.Waiting;
-    RanStates[3] = RanStates.Skip;
     Object.freeze(RanStates);
     
     // testnameMap maps the name of the test or group to the instance. This makes is
@@ -72,15 +56,15 @@ var Lapiz = Lapiz || Object.create(null);
         return self._passed;
       };
 
-      self._ran = RanStates.NotRan.Int;
+      self._ran = RanStates.NotRan;
       self.ran = function(){
         return self._ran;
       }
 
       self.dependents = [];
       self.finish = function(){
-        if (self._ran !== RanStates.Skip.Int){
-          self._ran = RanStates.Ran.Int;
+        if (self._ran !== RanStates.Skip){
+          self._ran = RanStates.Ran;
         }
         var ln = self.dependents.length;
         var i;
@@ -100,8 +84,8 @@ var Lapiz = Lapiz || Object.create(null);
           self._passed = false;
         }
 
-        if (dependency.ran() === RanStates.Skip.Int){
-          self._ran = RanStates.Skip.Int;
+        if (dependency.ran() === RanStates.Skip){
+          self._ran = RanStates.Skip;
         }
         
         waitingOn--;
@@ -140,7 +124,7 @@ var Lapiz = Lapiz || Object.create(null);
       self.nameList = name.split("/");
       self.dependencyNames = dependencies;
       self.func = testFunc;
-      self._ran = RanStates.NotRan.Int;
+      self._ran = RanStates.NotRan;
       self._failed = false;
       self.scheduled = false;
       self.circularCheck = false;
@@ -190,13 +174,13 @@ var Lapiz = Lapiz || Object.create(null);
       };
 
       self.dependencyCallback = function(dependency){
-        if (dependency.failed() || dependency.ran() === RanStates.Skip.Int){
-          self._ran = RanStates.Skip.Int;
+        if (dependency.failed() || dependency.ran() === RanStates.Skip){
+          self._ran = RanStates.Skip;
         }
 
         waitingOn--;
         if (waitingOn === 0){
-          if (self._ran != RanStates.Skip.Int){
+          if (self._ran != RanStates.Skip){
             self.run();
           } else {
             self.pub.finish(); 
@@ -205,7 +189,7 @@ var Lapiz = Lapiz || Object.create(null);
       }
 
       self.run = function(){
-        if (self._ran != RanStates.Skip.Int){
+        if (self._ran != RanStates.Skip){
           self.start = Date.now();
           try {
             self.func(self.pub);
@@ -221,7 +205,7 @@ var Lapiz = Lapiz || Object.create(null);
           }
         }
 
-        if (self._ran !== RanStates.Waiting.Int){
+        if (self._ran !== RanStates.Waiting){
           self.pub.finish();
         }
       }
@@ -229,12 +213,12 @@ var Lapiz = Lapiz || Object.create(null);
       // > TestObject.async(milliseconds, message)
       var timeout;
       self.pub.async = function(ms, msg){
-        self._ran = RanStates.Waiting.Int;
+        self._ran = RanStates.Waiting;
         if (timeout !== undefined){
           clearTimeout(timeout);
         }
         timeout = setTimeout(function(){
-          self._ran = RanStates.Ran.Int;
+          self._ran = RanStates.Ran;
           if (msg === undefined){
             msg = "Timeout";
           }
@@ -246,9 +230,9 @@ var Lapiz = Lapiz || Object.create(null);
       self.dependents = [];
       // > TestObject.finish()
       self.pub.finish = function(){
-        if (self._ran !== RanStates.Skip.Int){
+        if (self._ran !== RanStates.Skip){
           self.time = Date.now() - self.start;
-          self._ran = RanStates.Ran.Int;
+          self._ran = RanStates.Ran;
         }
         if (timeout !== undefined){
           clearTimeout(timeout);
@@ -330,7 +314,7 @@ var Lapiz = Lapiz || Object.create(null);
 
       if (group.test !== undefined){
         self.defined++;
-        if (group.test.ran() === RanStates.Ran.Int){
+        if (group.test.ran() === RanStates.Ran){
           self.ran++;
           if (group.test.passed()){
             self.passed++;
@@ -529,9 +513,9 @@ var Lapiz = Lapiz || Object.create(null);
       var run = true;
       for(i=0; i<ln; i++){
         dependency = nameMap[test.dependencyNames[i]];
-        if (dependency.failed() || dependency.ran() === RanStates.Skip.Int){
-          test._ran = RanStates.Skip.Int;
-        } else if (dependency.ran() === RanStates.NotRan.Int || dependency.ran() === RanStates.Waiting.Int){
+        if (dependency.failed() || dependency.ran() === RanStates.Skip){
+          test._ran = RanStates.Skip;
+        } else if (dependency.ran() === RanStates.NotRan || dependency.ran() === RanStates.Waiting){
           test.addDependency(dependency);
           run = false;
         }
