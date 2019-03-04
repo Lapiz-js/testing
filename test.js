@@ -14,6 +14,29 @@ var Lapiz = Lapiz || Object.create(null);
       return Object.create(null);
     }
 
+    var RanStates = {
+      "NotRan" : {
+        "Str": "NotRan",
+        "Int": 0
+      },
+      "Ran" : {
+        "Str": "Ran",
+        "Int": 1
+      },
+      "Waiting" : {
+        "Str": "Waiting",
+        "Int": 2
+      },
+      "Skip" : {
+        "Str": "Skip",
+        "Int": 3
+      },
+    };
+    RanStates[0] = RanStates.NotRan;
+    RanStates[1] = RanStates.Ran;
+    RanStates[2] = RanStates.Waiting;
+    RanStates[3] = RanStates.Skip;
+    Object.freeze(RanStates);
     
     // testnameMap maps the name of the test or group to the instance. This makes is
     // easier to retreive by name than splitting the name by / are recursing
@@ -69,17 +92,16 @@ var Lapiz = Lapiz || Object.create(null);
 
       self.ran = function(){
         var childNames = Object.keys(self.children);
-        var ran = true;
         var i;
         for(i=0; i<childNames.length; i++){
-          if (!self.children[childNames[i]].ran()){
-            ran = false;
+          if (self.children[childNames[i]].ran() === RanStates.NotRan.Int){
+            return RanStates.NotRan.Int;
           }
         }
-        if (ran && self.test !== undefined){
-          ran = self.test.ran();
+        if (self.test !== undefined){
+          return self.test.ran();
         }
-        return ran;
+        return RanStates.Ran.Int;
       }
 
       return self;
@@ -113,7 +135,7 @@ var Lapiz = Lapiz || Object.create(null);
       self.dependencyNames = dependencies;
       self.dependencies = [];
       self.func = testFunc;
-      self._ran = false;
+      self._ran = RanStates.NotRan.Int;
       self._failed = false;
       self.scheduled = false;
       self.circularCheck = false;
@@ -292,7 +314,7 @@ var Lapiz = Lapiz || Object.create(null);
 
       if (group.test !== undefined){
         self.defined++;
-        if (group.test.ran()){
+        if (group.test.ran() === RanStates.Ran.Int){
           self.ran++;
           if (group.test.passed()){
             self.passed++;
@@ -373,7 +395,7 @@ var Lapiz = Lapiz || Object.create(null);
             test.pub.error("<pre>" + err.stack + "</pre>");
           }
         }
-        test._ran = true;
+        test._ran = RanStates.Ran.Int;
         test.time = Date.now() - s;
       }
     }
@@ -446,6 +468,7 @@ var Lapiz = Lapiz || Object.create(null);
       _addTest(name, dependencies, testFunc);
     };
     Object.defineProperty($L, "Test", {"value":_TestInterface});
+    Object.defineProperty($L.Test, "RanStates", {"value":RanStates});
 
     // > Lapiz.Test.Run()    
     // Runs all the tests and returns a Result object. The children of the

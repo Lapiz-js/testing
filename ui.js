@@ -16,7 +16,7 @@
 
         out.push("<span id='coverage'></span></h1>")
 
-        appendGroupToOut(results, out)
+        appendGroupToOut(results, out);
         appendCoverageToOut(out);
 
         document.getElementsByTagName("body")[0].innerHTML+= out.join("");
@@ -83,7 +83,7 @@
         out.push("</div>");
       } else {
         var t = "x"
-        if (!group.test.ran()){
+        if (group.test.ran() !== Lapiz.Test.RanStates.Ran.Int){
           out.push("<div class='DidNotRun test'>");
         } else if (group.test.passed()){
           out.push("<div class='Passed test'>");
