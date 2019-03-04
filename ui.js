@@ -4,29 +4,30 @@
     // add 10ms delay to give UI tests a chance to run
     document.addEventListener("DOMContentLoaded", function(){
       setTimeout(function(){
-        var results = Lapiz.Test.Run();
+        var callback = function(results){
+          var overall = "Passed";
+          var out = [];
+          if (results.defined !== results.passed){
+            out.push("<h1 class='Failed'> Of " + results.defined + " tests, " + results.ran + " ran and " + results.failed + " <a href='#firstFailure'>failed</a>");
+          } else {
+            out.push("<h1 class='Passed'>" + results.defined + " Passed");
+          }
 
-        var overall = "Passed";
-        var out = [];
-        if (results.defined !== results.passed){
-          out.push("<h1 class='Failed'> Of " + results.defined + " tests, " + results.ran + " ran and " + results.failed + " <a href='#firstFailure'>failed</a>");
-        } else {
-          out.push("<h1 class='Passed'>" + results.defined + " Passed");
-        }
+          out.push("<span id='coverage'></span></h1>")
 
-        out.push("<span id='coverage'></span></h1>")
+          appendGroupToOut(results, out);
+          appendCoverageToOut(out);
 
-        appendGroupToOut(results, out);
-        appendCoverageToOut(out);
+          document.getElementsByTagName("body")[0].innerHTML+= out.join("");
 
-        document.getElementsByTagName("body")[0].innerHTML+= out.join("");
-
-        var firstFailure = document.querySelector(".Failed.test");
-        if (firstFailure){
-          var ffa = document.createElement("a");
-          ffa.setAttribute('name', 'firstFailure');
-          firstFailure.parentNode.insertBefore(ffa,firstFailure);
-        }
+          var firstFailure = document.querySelector(".Failed.test");
+          if (firstFailure){
+            var ffa = document.createElement("a");
+            ffa.setAttribute('name', 'firstFailure');
+            firstFailure.parentNode.insertBefore(ffa,firstFailure);
+          }
+        };
+        Lapiz.Test.Run(callback);
       }, 10);
     });
 

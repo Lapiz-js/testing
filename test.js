@@ -1,11 +1,8 @@
 var Lapiz = Lapiz || Object.create(null);
 
-
 // SetupTestModule is a wrapper so that if Lapiz is used, it will be loaded
 // as a module and if it is not used, it will create a dummy Lapiz.
 (function SetupTestModule(){
-  
-
   function TestingModule($L){
 
     // We're using Object.create(null) as a map, this makes it a little cleaner
@@ -46,24 +43,19 @@ var Lapiz = Lapiz || Object.create(null);
     // test is a list of all the test, it does not include groups
     var tests = [];
 
-    // _Group is not exposed, it is just used internally to handle dependancies
+    // _Group is not exposed, it is just used internally to handle dependencies
     function _Group(name, parent){
       var self = _Map();
 
       self.name = name;
-      self.scheduled = false;
       self.circularCheck = false;
-
-      self.parent = parent;
-      self.children = _Map();
       self.fullName = function(){
         return self.parent.fullName() + self.name + "/";
       }
 
-      /**
-       * @method GetChild returns a child by name, creates the child if it doesn't
-       * exist.
-       */
+      self.parent = parent;
+      self.children = _Map();
+
       self.GetChild = function(name){
         var child = self.children[name];
         if (child === undefined){
@@ -75,33 +67,47 @@ var Lapiz = Lapiz || Object.create(null);
       };
 
       self.failed = function(){ return !self.passed(); };
+      self._passed = true;
       self.passed = function(){
-        var childNames = Object.keys(self.children);
-        var passed = true;
-        var i;
-        for(i=0; i<childNames.length; i++){
-          if (!self.children[childNames[i]].passed()){
-            passed = false;
-          }
-        }
-        if (passed && self.test !== undefined){
-          passed = self.test.passed();
-        }
-        return passed;
+        return self._passed;
       };
 
+      self._ran = RanStates.NotRan.Int;
       self.ran = function(){
-        var childNames = Object.keys(self.children);
+        return self._ran;
+      }
+
+      self.dependents = [];
+      self.finish = function(){
+        if (self._ran !== RanStates.Skip.Int){
+          self._ran = RanStates.Ran.Int;
+        }
+        var ln = self.dependents.length;
         var i;
-        for(i=0; i<childNames.length; i++){
-          if (self.children[childNames[i]].ran() === RanStates.NotRan.Int){
-            return RanStates.NotRan.Int;
-          }
+        for (i=0;i<ln;i++){
+          self.dependents[i](self);
         }
-        if (self.test !== undefined){
-          return self.test.ran();
+      }
+
+      var waitingOn = 0;
+      self.addDependency = function(dependency){
+        dependency.dependents.push(self.dependencyCallback);
+        waitingOn++;
+      };
+
+      self.dependencyCallback = function(dependency){
+        if (dependency.failed()){
+          self._passed = false;
         }
-        return RanStates.Ran.Int;
+
+        if (dependency.ran() === RanStates.Skip.Int){
+          self._ran = RanStates.Skip.Int;
+        }
+        
+        waitingOn--;
+        if (waitingOn === 0){
+          self.finish()
+        }
       }
 
       return self;
@@ -133,7 +139,6 @@ var Lapiz = Lapiz || Object.create(null);
       self.name = name;
       self.nameList = name.split("/");
       self.dependencyNames = dependencies;
-      self.dependencies = [];
       self.func = testFunc;
       self._ran = RanStates.NotRan.Int;
       self._failed = false;
@@ -177,6 +182,84 @@ var Lapiz = Lapiz || Object.create(null);
       // Returns a bool indicating if the test has failed.
       self.pub.failed = function(){ return self._failed; };
       self.failed = self.pub.failed;
+
+      var waitingOn = 0;
+      self.addDependency = function(dependency){
+        dependency.dependents.push(self.dependencyCallback);
+        waitingOn++;
+      };
+
+      self.dependencyCallback = function(dependency){
+        if (dependency.failed() || dependency.ran() === RanStates.Skip.Int){
+          self._ran = RanStates.Skip.Int;
+        }
+
+        waitingOn--;
+        if (waitingOn === 0){
+          if (self._ran != RanStates.Skip.Int){
+            self.run();
+          } else {
+            self.pub.finish(); 
+          }
+        }
+      }
+
+      self.run = function(){
+        if (self._ran != RanStates.Skip.Int){
+          self.start = Date.now();
+          try {
+            self.func(self.pub);
+          } catch(err) {
+            if (err.message){
+              console.error(err);
+              console.log(err.stack);
+              self.pub.error(err.message + "<pre>" + err.stack + "</pre>");
+            } else {
+              console.error(err.stack);
+              self.pub.error("<pre>" + err.stack + "</pre>");
+            }
+          }
+        }
+
+        if (self._ran !== RanStates.Waiting.Int){
+          self.pub.finish();
+        }
+      }
+
+      // > TestObject.async(milliseconds, message)
+      var timeout;
+      self.pub.async = function(ms, msg){
+        self._ran = RanStates.Waiting.Int;
+        if (timeout !== undefined){
+          clearTimeout(timeout);
+        }
+        timeout = setTimeout(function(){
+          self._ran = RanStates.Ran.Int;
+          if (msg === undefined){
+            msg = "Timeout";
+          }
+          self.pub.error(msg);
+          self.pub.finish();
+        }, ms);
+      }
+
+      self.dependents = [];
+      // > TestObject.finish()
+      self.pub.finish = function(){
+        if (self._ran !== RanStates.Skip.Int){
+          self.time = Date.now() - self.start;
+          self._ran = RanStates.Ran.Int;
+        }
+        if (timeout !== undefined){
+          clearTimeout(timeout);
+        }
+        var ln = self.dependents.length;
+        var i;
+        for (i=0;i<ln;i++){
+          self.dependents[i](self);
+        }
+        self.dependents = [];
+      }
 
       // > TestObject.passed()
       // Returns a bool indicating if the test is currently passing.
@@ -227,73 +310,6 @@ var Lapiz = Lapiz || Object.create(null);
     function _remove(arr, el){
       var i = arr.indexOf(el);
       if (i > -1) { arr.splice(i, 1); }
-    }
-
-    function _linkDependancy(dependant, dependency){
-      dependant.dependencies.push(dependency);
-    }
-
-    /**
-     * _resolveDependancies links all the dependencies that were given by name
-     * and links them to the actual test.
-     */
-    function _resolveDependancies(group){
-      var childNames = Object.keys(group.children);
-      var i, child;
-      for (i=0; i<childNames.length;i++){
-        child = group.children[ childNames[i] ];
-        _resolveDependancies(child);
-      }
-
-      // if this group contains a test, resolve it's dependencies
-      var test = group.test;
-      if (test !== undefined){
-        for(i=0; i<test.dependencyNames.length; i++){
-          dependency = nameMap[test.dependencyNames[i]];
-          if (dependency === undefined){
-            throw new Error("Test) Undefined dependency " + test.dependencyNames[i] + " in test " + test.name);
-          }
-          _linkDependancy(test, dependency);
-        }
-        dependencies = test.dependencies.slice(0); //copy
-      }
-    }
-
-    function _schedule(group, schedule, dependents){
-      if (dependents.indexOf(group) !== -1){
-        throw new Error("Found circular dependency in " + group.fullName());
-      }
-      if (group.scheduled){
-        return;
-      }
-      group.scheduled = true;
-
-      var i, childNames;
-      var idx = dependents.length;
-      dependents.push(group);
-      //check dependencies
-      if (group.dependencies !== undefined){
-        for(i=0; i<group.dependencies.length; i++){
-          _schedule(group.dependencies[i], schedule, dependents);
-        }
-      }
-      //check children
-      if (group.children !== undefined){
-        childNames = Object.keys(group.children);
-        for(i=0; i<childNames.length; i++){
-          _schedule(group.children[childNames[i]], schedule, dependents);
-        }
-      }
-
-      //check self
-      if (group.test !== undefined){
-        _schedule(group.test, schedule, dependents);
-      }
-      dependents.splice(idx, 1);
-
-      if (group.func !== undefined){
-        schedule.push(group);
-      }
     }
 
     // > Result
@@ -371,35 +387,6 @@ var Lapiz = Lapiz || Object.create(null);
       return self;
     }
 
-    function _run(test){
-      var i, dependency;
-      var run = true;
-      for(i=0; i<test.dependencies.length; i++){
-        dependency = test.dependencies[i];
-        if (!dependency.ran() || dependency.failed()){
-          run = false;
-          break;
-        }
-      }
-      if (run){
-        var s = Date.now();
-        try {
-          test.func(test.pub);
-        } catch(err) {
-          if (err.message){
-            console.error(err);
-            console.log(err.stack);
-            test.pub.error(err.message + "<pre>" + err.stack + "</pre>");
-          } else {
-            console.error(err.stack);
-            test.pub.error("<pre>" + err.stack + "</pre>");
-          }
-        }
-        test._ran = RanStates.Ran.Int;
-        test.time = Date.now() - s;
-      }
-    }
-
     // > Lapiz.Test(TestName, TestDependencies, TestFunction)
     // > Lapiz.Test(TestName, TestFunction)
     // Defines a test.
@@ -470,19 +457,100 @@ var Lapiz = Lapiz || Object.create(null);
     Object.defineProperty($L, "Test", {"value":_TestInterface});
     Object.defineProperty($L.Test, "RanStates", {"value":RanStates});
 
+    // _checkCircularDependencies makes sure the tests form an acyclic directed
+    // graph. If the graph is not well formed it will throw an error.
+    function _checkCircularDependencies(obj, visited){
+      if (obj.circularCheck){
+        return;
+      }
+      var fn = obj.fullName();
+      if (visited.includes(fn)){
+        throw new Error("Encountered circular dependency in test '"+fn+"'");
+      }
+
+      visited = visited.slice(0);
+      visited.push(fn);
+      var i, ln;
+
+      if (obj.children !== undefined){
+        var keys = Object.keys(obj.children);
+        ln = keys.length;
+        for(i=0 ; i<ln ; i++){
+          _checkCircularDependencies(obj.children[keys[i]], visited);
+        }
+        if (obj.test != undefined){
+          _checkCircularDependencies(obj.test, visited);
+        }
+      } else {
+        var dep;
+        ln = obj.dependencyNames.length;
+        for(i=0 ; i<ln ; i++){
+          dep = nameMap[obj.dependencyNames[i]];
+          if (dep === undefined){
+            throw new Error("Undefined dependency '"+obj.dependencyNames[i]+"' in test '"+fn+"'");
+          }
+          _checkCircularDependencies(dep, visited);
+        }
+      }
+      obj.circularCheck = true;
+    }
+
+    function _runGroupAsync(group){
+      setTimeout(function(){
+        _runGroup(group);        
+      }, 1);
+    }
+
+    function _runTestAsync(test){
+      setTimeout(function(){
+        _runTest(test);        
+      }, 1);
+    }
+
+    function _runGroup(group){
+      var keys = Object.keys(group.children);
+      var ln = keys.length;
+      var i, child;
+      for (i=0;i<ln;i++){
+        child = group.children[keys[i]];
+        group.addDependency(child);
+        _runGroupAsync(child);
+      }
+
+      if (group.test !== undefined){
+        group.addDependency(group.test);
+        _runTestAsync(group.test);
+      }
+    }
+
+    function _runTest(test){
+      var ln = test.dependencyNames.length;
+      var i, dependency;
+      var run = true;
+      for(i=0; i<ln; i++){
+        dependency = nameMap[test.dependencyNames[i]];
+        if (dependency.failed() || dependency.ran() === RanStates.Skip.Int){
+          test._ran = RanStates.Skip.Int;
+        } else if (dependency.ran() === RanStates.NotRan.Int || dependency.ran() === RanStates.Waiting.Int){
+          test.addDependency(dependency);
+          run = false;
+        }
+      }
+
+      if (run){
+        test.run();        
+      }
+    }
+
     // > Lapiz.Test.Run()    
     // Runs all the tests and returns a Result object. The children of the
     // Result object form a tree containing all the tests.
-    function _runAll(){
-      _resolveDependancies(_root);
-      var plan = [];
-      _schedule(_root, plan, []);
-      var i, s;
-      //TODO: break this up with work queue
-      for(i=0; i<plan.length; i++){
-        _run(plan[i]);
-      }
-      return _Result(_root);
+    function _runAll(callback){
+      _checkCircularDependencies(_root, []);
+      _root.dependents.push(function(){
+        callback(_Result(_root));
+      });
+      _runGroup(_root);
     };
     Object.defineProperty($L.Test, "Run", {"value":_runAll});
 
